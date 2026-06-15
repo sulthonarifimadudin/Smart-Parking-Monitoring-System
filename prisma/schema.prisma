@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------------------------------------------
+// SMART PARKING MONITORING SYSTEM — PRISMA SCHEMA
+// -------------------------------------------------------
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  VIOLATION
+}
+
+enum DecisionStatus {
+  CLEAR
+  VERIFIED_WITH_VIOLATION
+  FACE_MISMATCH
+  PLATE_MISMATCH
+  NEED_VERIFICATION
+}
+
+enum ViolationType {
+  OUT_OF_AREA
+  MISALIGNED_PARKING
+}
+
+enum NotificationStatus {
+  SENT
+  PENDING
+  FAILED
+}
+
+enum UserRole {
+  ADMIN
+  SECURITY_OFFICER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// -------------------------------------------------------
+// User Account
+// -------------------------------------------------------
+model UserAccount {
+  user_id    String     @id @default(uuid())
+  username   String     @unique
+  full_name  String
+  role       UserRole
+  status     UserStatus
+  last_login DateTime?
+  avatar_url String?
+  email      String     @unique
+  
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+// -------------------------------------------------------
+// Parking Sessions
+// -------------------------------------------------------
+model SesiParkir {
+  session_id         String          @id @default(uuid())
+  plat_nomor         String
+  waktu_masuk        DateTime
+  waktu_keluar       DateTime?
+  status_sesi        SessionStatus
+  status_keputusan   DecisionStatus?
+  lokasi_gate_masuk  String
+  lokasi_gate_keluar String?
+  zona_parkir        String
+
+  // Relations
+  pelanggaran        LogPelanggaran[]
+  
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+// -------------------------------------------------------
+// Violation Logs
+// -------------------------------------------------------
+model LogPelanggaran {
+  log_id            String             @id @default(uuid())
+  session_id        String
+  plat_nomor        String
+  waktu_pelanggaran DateTime
+  lokasi_parkir     String
+  jenis_pelanggaran ViolationType
+  foto_bukti_url    String
+  status_notifikasi NotificationStatus
+
+  // Foreign Key
+  session           SesiParkir         @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+  
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
