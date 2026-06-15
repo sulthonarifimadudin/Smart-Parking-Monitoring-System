@@ -9,9 +9,10 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 interface HeaderProps {
   title: string;
   subtitle?: string;
+  action?: React.ReactNode;
 }
 
-export function Header({ title, subtitle }: HeaderProps) {
+export function Header({ title, subtitle, action }: HeaderProps) {
   const { language, setLanguage, t } = useLanguage();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notifCount] = useState(3);
@@ -24,10 +25,13 @@ export function Header({ title, subtitle }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#050915]/80 backdrop-blur-xl">
       <div className="flex items-center justify-between px-6 py-3">
-        {/* Left: Page title */}
-        <div>
-          <h1 className="text-lg font-bold text-white leading-tight">{title}</h1>
-          {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+        {/* Left: Page title & Action */}
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-lg font-bold text-white leading-tight">{title}</h1>
+            {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+          </div>
+          {action && <div>{action}</div>}
         </div>
 
         {/* Right: Search + indicators */}

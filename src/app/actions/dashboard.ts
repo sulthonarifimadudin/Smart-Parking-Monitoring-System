@@ -8,13 +8,21 @@ import {
   DailyViolationData,
   ZoneDistributionData
 } from '@/lib/types';
-import { startOfDay, endOfDay, subDays, format } from 'date-fns';
+import { startOfDay, endOfDay, subDays, format, startOfWeek, startOfMonth } from 'date-fns';
 import { id } from 'date-fns/locale';
 
-export async function getDashboardData() {
+export type TimeFilter = 'today' | 'week' | 'month';
+
+export async function getDashboardData(timeFilter: TimeFilter = 'today') {
   const today = new Date();
-  const start = startOfDay(today);
+  let start = startOfDay(today);
   const end = endOfDay(today);
+
+  if (timeFilter === 'week') {
+    start = startOfWeek(today, { weekStartsOn: 1 });
+  } else if (timeFilter === 'month') {
+    start = startOfMonth(today);
+  }
 
   // 1. Fetch Stats
   const active_vehicles = await prisma.sesiParkir.count({ where: { status_sesi: 'ACTIVE' } });
@@ -85,7 +93,7 @@ export async function getDashboardData() {
   // 3. Fallback mock data for charts (since aggregating by hour/day in Prisma SQL is complex and we are seeding mock data anyway)
   // We will pull all sessions for today to build hourly traffic
   const todaysSessions = await prisma.sesiParkir.findMany({
-    where: { waktu_masuk: { gte: startOfDay(today), lte: endOfDay(today) } },
+    where: { waktu_masuk: { gte: start, lte: end } },
     select: { waktu_masuk: true, waktu_keluar: true }
   });
 

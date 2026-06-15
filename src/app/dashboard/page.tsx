@@ -3,13 +3,13 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { KPICard } from '@/components/shared/KPICard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { getDashboardData } from '@/app/actions/dashboard';
+import { getDashboardData, TimeFilter } from '@/app/actions/dashboard';
 import { useQuery } from '@tanstack/react-query';
 import {
   Car, AlertTriangle, LogIn, LogOut, ScanFace, ScanLine,
   ArrowUpRight, ArrowDownRight, Clock, Cctv, ExternalLink, WifiOff,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -31,10 +31,12 @@ export default function DashboardPage() {
   const { t } = useLanguage();
   const [selectedCamId, setSelectedCamId] = useState(dashboardCameras[0].id);
   const selectedCam = dashboardCameras.find(c => c.id === selectedCamId) || dashboardCameras[0];
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('today');
+  const [cameraMode, setCameraMode] = useState<'simulation' | 'live'>('simulation');
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['dashboardData'],
-    queryFn: () => getDashboardData(),
+    queryKey: ['dashboardData', timeFilter],
+    queryFn: () => getDashboardData(timeFilter),
     refetchInterval: 5000, // auto refresh every 5 seconds for live feel
   });
 
@@ -60,6 +62,22 @@ export default function DashboardPage() {
     <DashboardLayout
       title={t.dashboard.title}
       subtitle={t.dashboard.subtitle}
+      action={
+        <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-1">
+          <button 
+            onClick={() => setTimeFilter('today')}
+            className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all", timeFilter === 'today' ? "bg-blue-500 text-white" : "text-slate-400 hover:text-slate-200")}
+          >Hari Ini</button>
+          <button 
+            onClick={() => setTimeFilter('week')}
+            className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all", timeFilter === 'week' ? "bg-blue-500 text-white" : "text-slate-400 hover:text-slate-200")}
+          >Pekan Ini</button>
+          <button 
+            onClick={() => setTimeFilter('month')}
+            className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all", timeFilter === 'month' ? "bg-blue-500 text-white" : "text-slate-400 hover:text-slate-200")}
+          >Bulan Ini</button>
+        </div>
+      }
     >
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
@@ -123,7 +141,6 @@ export default function DashboardPage() {
       <div className="mb-6 grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Main Feed (Large) */}
         <div className="xl:col-span-2 glass-card overflow-hidden flex flex-col">
-          {/* Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
             <div className="flex items-center gap-2.5">
               <Cctv className="w-4 h-4 text-blue-400" />
@@ -133,18 +150,37 @@ export default function DashboardPage() {
                 <span className="text-xs text-green-400 font-medium">{t.dashboard.liveCamera.live}</span>
               </div>
             </div>
-            <a
-              href="/dashboard/cameras"
-              className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              {t.dashboard.liveCamera.viewAll}
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+            
+            {/* Camera Mode Toggle */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-full p-0.5">
+                <button
+                  onClick={() => setCameraMode('simulation')}
+                  className={cn("px-3 py-1 text-xs font-medium rounded-full transition-all", cameraMode === 'simulation' ? "bg-blue-500 text-white" : "text-slate-400 hover:text-slate-200")}
+                >
+                  Simulation
+                </button>
+                <button
+                  onClick={() => setCameraMode('live')}
+                  className={cn("px-3 py-1 text-xs font-medium rounded-full transition-all flex items-center gap-1.5", cameraMode === 'live' ? "bg-red-500 text-white" : "text-slate-400 hover:text-slate-200")}
+                >
+                  <span className={cn("w-1.5 h-1.5 rounded-full", cameraMode === 'live' ? "bg-white animate-pulse" : "bg-slate-500")} />
+                  Live Demo
+                </button>
+              </div>
+              <a
+                href="/dashboard/cameras"
+                className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                {t.dashboard.liveCamera.viewAll}
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
 
           {/* Large Video Player */}
           <div className="relative aspect-video bg-[#050915] w-full">
-            <MiniCameraCard cam={selectedCam} isLarge={true} />
+            <MiniCameraCard cam={selectedCam} isLarge={true} mode={cameraMode} />
           </div>
         </div>
 
@@ -364,18 +400,48 @@ function MiniCameraCard({
   cam,
   index,
   isLarge = false,
+  mode = 'simulation',
 }: {
   cam: { id: string; name: string; status: 'ONLINE' | 'RECORDING' | 'OFFLINE'; hasAlert: boolean; seed: string };
   index?: number;
   isLarge?: boolean;
+  mode?: 'simulation' | 'live';
 }) {
   const { t } = useLanguage();
   const [time, setTime] = useState(() => new Date());
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (mode === 'live' && isLarge) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        })
+        .catch(err => {
+          console.error("Error accessing webcam:", err);
+        });
+    } else {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+    }
+
+    return () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach(track => track.stop());
+      }
+    };
+  }, [mode, isLarge]);
 
   const isOffline = cam.status === 'OFFLINE';
   const isRec = cam.status === 'RECORDING';
@@ -397,11 +463,32 @@ function MiniCameraCard({
       ) : (
         <div className="aspect-video relative bg-[#050915] overflow-hidden">
           {/* Feed */}
-          <img
-            src={`https://picsum.photos/seed/${cam.seed}/480/270`}
-            alt={cam.name}
-            className="w-full h-full object-cover brightness-75 group-hover:brightness-90 transition-all duration-300"
-          />
+          {isLarge ? (
+            mode === 'simulation' ? (
+              <video
+                src="/VideotesParkiran4.MOV"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover brightness-90"
+              />
+            ) : (
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover brightness-90"
+              />
+            )
+          ) : (
+            <img
+              src={`https://picsum.photos/seed/${cam.seed}/480/270`}
+              alt={cam.name}
+              className="w-full h-full object-cover brightness-75 group-hover:brightness-90 transition-all duration-300"
+            />
+          )}
 
           {/* CRT scanlines */}
           <div

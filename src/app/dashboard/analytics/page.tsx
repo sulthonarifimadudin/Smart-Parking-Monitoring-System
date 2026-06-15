@@ -1,7 +1,10 @@
 'use client';
 
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { mockHourlyTraffic, mockDailyViolations, mockViolationTypes, mockZoneDistribution, mockAnalyticsSummary } from '@/lib/mock-data';
+import { mockViolationTypes } from '@/lib/mock-data';
+import { getDashboardData, TimeFilter } from '@/app/actions/dashboard';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
   PieChart, Pie, Cell,
@@ -25,54 +28,91 @@ const peakHoursData = [
   { hour: '17', mon: 0, tue: 0, wed: 1, thu: 0, fri: 1 },
 ];
 
-const utilizationData = mockZoneDistribution.map((z) => ({
-  zone: z.zone,
-  terisi: z.count,
-  kosong: z.capacity - z.count,
-  utilisasi: Math.round((z.count / z.capacity) * 100),
-}));
-
 const PIE_COLORS = ['#ef4444', '#f59e0b'];
 const STACKED_COLORS = { terisi: '#3b82f6', kosong: 'rgba(59,130,246,0.15)' };
 
-const statCards = [
-  {
-    label: 'Total Sesi',
-    value: mockAnalyticsSummary.total_sessions,
-    icon: Car,
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
-    suffix: 'sesi',
-  },
-  {
-    label: 'Total Pelanggaran',
-    value: mockAnalyticsSummary.total_violations,
-    icon: AlertTriangle,
-    color: 'text-red-400',
-    bg: 'bg-red-500/10',
-    suffix: 'kasus',
-  },
-  {
-    label: 'Violation Rate',
-    value: mockAnalyticsSummary.violation_rate,
-    icon: TrendingDown,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10',
-    suffix: '%',
-  },
-  {
-    label: 'Rata-rata Durasi',
-    value: `${Math.floor(mockAnalyticsSummary.avg_parking_duration_minutes / 60)}j ${mockAnalyticsSummary.avg_parking_duration_minutes % 60}m`,
-    icon: Clock,
-    color: 'text-violet-400',
-    bg: 'bg-violet-500/10',
-    suffix: '',
-  },
-];
-
 export default function AnalyticsPage() {
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('today');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboardData', timeFilter],
+    queryFn: () => getDashboardData(timeFilter),
+    refetchInterval: 5000,
+  });
+
+  if (isLoading || !data) {
+    return (
+      <DashboardLayout title="Analytics" subtitle="Visualisasi dan statistik mendalam sistem parkir">
+        <div className="flex items-center justify-center h-64 text-slate-400">Loading data from Postgres...</div>
+      </DashboardLayout>
+    );
+  }
+
+  const { stats, hourlyTraffic, dailyViolations, zoneDistribution } = data;
+
+  const utilizationData = zoneDistribution.map((z) => ({
+    zone: z.zone,
+    terisi: z.count,
+    kosong: z.capacity - z.count,
+    utilisasi: Math.round((z.count / z.capacity) * 100),
+  }));
+
+  const statCards = [
+    {
+      label: 'Total Sesi',
+      value: stats.vehicles_entered_today,
+      icon: Car,
+      color: 'text-blue-400',
+      bg: 'bg-blue-500/10',
+      suffix: 'sesi',
+    },
+    {
+      label: 'Total Pelanggaran',
+      value: stats.todays_violations,
+      icon: AlertTriangle,
+      color: 'text-red-400',
+      bg: 'bg-red-500/10',
+      suffix: 'kasus',
+    },
+    {
+      label: 'Violation Rate',
+      value: stats.vehicles_entered_today ? Math.round((stats.todays_violations / stats.vehicles_entered_today) * 100) : 0,
+      icon: TrendingDown,
+      color: 'text-amber-400',
+      bg: 'bg-amber-500/10',
+      suffix: '%',
+    },
+    {
+      label: 'Rata-rata Durasi',
+      value: `1j 45m`, // Mock for now
+      icon: Clock,
+      color: 'text-violet-400',
+      bg: 'bg-violet-500/10',
+      suffix: '',
+    },
+  ];
+
   return (
-    <DashboardLayout title="Analytics" subtitle="Visualisasi dan statistik mendalam sistem parkir">
+    <DashboardLayout 
+      title="Analytics" 
+      subtitle="Visualisasi dan statistik mendalam sistem parkir"
+      action={
+        <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-1">
+          <button 
+            onClick={() => setTimeFilter('today')}
+            className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all", timeFilter === 'today' ? "bg-blue-500 text-white" : "text-slate-400 hover:text-slate-200")}
+          >Hari Ini</button>
+          <button 
+            onClick={() => setTimeFilter('week')}
+            className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all", timeFilter === 'week' ? "bg-blue-500 text-white" : "text-slate-400 hover:text-slate-200")}
+          >Pekan Ini</button>
+          <button 
+            onClick={() => setTimeFilter('month')}
+            className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all", timeFilter === 'month' ? "bg-blue-500 text-white" : "text-slate-400 hover:text-slate-200")}
+          >Bulan Ini</button>
+        </div>
+      }
+    >
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {statCards.map((card) => {
@@ -101,7 +141,7 @@ export default function AnalyticsPage() {
           <h3 className="text-sm font-semibold text-white mb-1">Vehicle Traffic by Hour</h3>
           <p className="text-xs text-slate-400 mb-4">Pola lalu lintas kendaraan per jam</p>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={mockHourlyTraffic} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+            <AreaChart data={hourlyTraffic} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
               <defs>
                 <linearGradient id="aBlue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -127,7 +167,7 @@ export default function AnalyticsPage() {
           <h3 className="text-sm font-semibold text-white mb-1">Violation Trends</h3>
           <p className="text-xs text-slate-400 mb-4">Tren pelanggaran 7 hari terakhir</p>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={mockDailyViolations} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+            <LineChart data={dailyViolations} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
               <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
