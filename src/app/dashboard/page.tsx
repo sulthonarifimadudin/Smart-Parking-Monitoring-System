@@ -391,9 +391,6 @@ export default function DashboardPage() {
 // ─── Mini Camera Data ──────────────────────────────────────────────
 const dashboardCameras = [
   { id: 'CAM-01', name: 'Gate Utara - Masuk', status: 'ONLINE' as const, hasAlert: false, seed: 'cam1' },
-  { id: 'CAM-02', name: 'Gate Utara - Keluar', status: 'RECORDING' as const, hasAlert: true, seed: 'cam2' },
-  { id: 'CAM-07', name: 'Zona C - Pelanggaran', status: 'RECORDING' as const, hasAlert: true, seed: 'cam7' },
-  { id: 'CAM-08', name: 'Zona D - Overview', status: 'OFFLINE' as const, hasAlert: false, seed: 'cam8' },
 ];
 
 function MiniCameraCard({
