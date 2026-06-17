@@ -414,17 +414,9 @@ function MiniCameraCard({
   }, []);
 
   useEffect(() => {
-    if (mode === 'live' && isLarge) {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-        })
-        .catch(err => {
-          console.error("Error accessing webcam:", err);
-        });
-    } else {
+    // Kami tidak lagi meminta getUserMedia karena sekarang stream berasal dari Python FastAPI.
+    // Jika masih ada video stream dari percobaan sebelumnya, kita hentikan.
+    if (mode !== 'live') {
       if (videoRef.current && videoRef.current.srcObject) {
         const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
         tracks.forEach(track => track.stop());
@@ -471,12 +463,13 @@ function MiniCameraCard({
                 className="w-full h-full object-cover brightness-90"
               />
             ) : (
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
+              <img
+                src={process.env.NEXT_PUBLIC_AI_STREAM_URL || "http://localhost:8000/video_feed"}
+                alt="AI Live Stream"
                 className="w-full h-full object-cover brightness-90"
+                onError={(e) => {
+                  e.currentTarget.src = "https://via.placeholder.com/800x450?text=Menunggu+AI+Stream...";
+                }}
               />
             )
           ) : (
